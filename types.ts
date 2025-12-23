@@ -1,5 +1,6 @@
 
 export type AssetType = 'image' | 'video';
+export type Language = 'en' | 'vi';
 
 export interface Asset {
   id: string;
@@ -13,6 +14,8 @@ export interface Asset {
   rating: number; // 0-5
   label?: 'red' | 'blue' | 'green' | 'yellow' | 'purple';
   date: string;
+  albumId?: string; // Link to specific albums
+  inTrash?: boolean;
   metadata: {
     camera?: string;
     lens?: string;
@@ -58,4 +61,4 @@ export interface ExportPreset {
   watermark: boolean;
 }
 
-export type Screen = 'onboarding' | 'library' | 'viewer' | 'dedup' | 'projects' | 'settings' | 'export';
+export type Screen = 'onboarding' | 'library' | 'viewer' | 'dedup' | 'projects' | 'settings' | 'export' | 'import';

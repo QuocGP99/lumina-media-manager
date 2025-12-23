@@ -13,6 +13,9 @@ export const MOCK_ASSETS: Asset[] = Array.from({ length: 40 }).map((_, i) => ({
   rating: Math.floor(Math.random() * 6),
   label: i % 10 === 0 ? 'red' : i % 10 === 1 ? 'green' : undefined,
   date: '2023-10-15',
+  inTrash: false,
+  // Randomly assign to one of the 3 mock albums
+  albumId: i % 4 === 0 ? 'wedding-2023' : i % 4 === 1 ? 'portrait-session' : i % 4 === 2 ? 'unsorted' : undefined,
   metadata: {
     camera: 'Sony A7IV',
     lens: 'FE 24-70mm F2.8 GM II',
