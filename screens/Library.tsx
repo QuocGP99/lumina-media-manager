@@ -6,7 +6,7 @@ import {
   Folder, Layers, Tag, Briefcase, Info, Download, Trash2, 
   Settings as SettingsIcon, MoreHorizontal, ExternalLink, Edit2, Copy, Move,
   Archive, Check, X as LucideX, ArrowUpDown, SortAsc, SortDesc, Image as ImageIcon,
-  RotateCcw, ShieldAlert, Video, FilterX
+  RotateCcw, ShieldAlert, Video, FilterX, FolderPlus
 } from 'lucide-react';
 import { Asset, Screen, ViewMode, Language } from '../types';
 import { translations } from '../translations';
@@ -48,7 +48,6 @@ const Library: React.FC<Props> = ({
   const [activeCollection, setActiveCollection] = useState<CollectionType | string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortKey>('date-desc');
-  const [isSortOpen, setIsSortOpen] = useState(false);
   const [notification, setNotification] = useState<{message: string, type: 'info' | 'success'} | null>(null);
   
   // Quick Filters State
@@ -56,12 +55,11 @@ const Library: React.FC<Props> = ({
   const [filterImage, setFilterImage] = useState(false);
   const [filterFavorite, setFilterFavorite] = useState(false);
   const [filterMinRating, setFilterMinRating] = useState(0);
+  const [showAlbumModal, setShowAlbumModal] = useState(false);
+  const [newAlbumName, setNewAlbumName] = useState('');
 
-  // Filter logic
   const filteredAssets = useMemo(() => {
     let result = [...assets];
-
-    // Basic Collection Filtering
     if (activeCollection === 'trash') {
       result = result.filter(a => a.inTrash);
     } else {
@@ -75,13 +73,11 @@ const Library: React.FC<Props> = ({
       }
     }
 
-    // Advanced Filters
     if (filterVideo && !filterImage) result = result.filter(a => a.type === 'video');
     if (filterImage && !filterVideo) result = result.filter(a => a.type === 'image');
     if (filterFavorite) result = result.filter(a => a.favorite);
     if (filterMinRating > 0) result = result.filter(a => a.rating >= filterMinRating);
 
-    // Search Query
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter(a => 
@@ -90,7 +86,6 @@ const Library: React.FC<Props> = ({
       );
     }
 
-    // Sorting
     result.sort((a, b) => {
       switch (sortMode) {
         case 'date-desc': return b.date.localeCompare(a.date);
@@ -116,17 +111,25 @@ const Library: React.FC<Props> = ({
     return albums.find(a => a.id === activeCollection)?.name || 'Library';
   }, [activeCollection, albums, t]);
 
-  const resetFilters = () => {
-    setFilterVideo(false);
-    setFilterImage(false);
-    setFilterFavorite(false);
-    setFilterMinRating(0);
-    setSearchQuery('');
-  };
-
   const showToast = (message: string, type: 'info' | 'success' = 'info') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handleCreateAlbum = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setNewAlbumName('');
+    setShowAlbumModal(true);
+  };
+
+  const handleConfirmCreateAlbum = () => {
+    if (newAlbumName.trim()) {
+      const newId = onAddAlbum(newAlbumName.trim());
+      setActiveCollection(newId);
+      showToast(language === 'en' ? 'Album created' : 'Đã tạo album', 'success');
+      setShowAlbumModal(false);
+      setNewAlbumName('');
+    }
   };
 
   const handleMoveToTrash = () => {
@@ -138,28 +141,10 @@ const Library: React.FC<Props> = ({
     }
   };
 
-  const handleRename = () => {
-    if (selectedAsset) {
-      const newName = prompt(language === 'en' ? 'Enter new name:' : 'Nhập tên mới:', selectedAsset.name);
-      if (newName && newName.trim() !== '') {
-        updateAsset(selectedAsset.id, { name: newName.trim() });
-        showToast('Asset renamed');
-      }
-    }
-  };
-
-  const handleOpenInFolder = () => {
-    if (selectedAsset) {
-      const path = `C:\\Users\\Lumina\\Pictures\\Vault\\${selectedAsset.name}`;
-      showToast(language === 'en' ? `Opened folder: ${path}` : `Đã mở thư mục: ${path}`);
-    }
-  };
-
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Toast Notification */}
       {notification && (
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-[#1a1d23] border border-[#00bcd4]/30 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-[#1a1d23] border border-[#00bcd4]/30 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4">
           <div className={`w-2 h-2 rounded-full ${notification.type === 'success' ? 'bg-green-400' : 'bg-[#00bcd4]'}`} />
           <span className="text-sm font-medium text-white">{notification.message}</span>
         </div>
@@ -174,7 +159,7 @@ const Library: React.FC<Props> = ({
           <span className="font-bold text-lg tracking-tight text-white">Lumina</span>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-2 space-y-6">
+        <nav className="flex-1 overflow-y-auto px-2 space-y-6 no-scrollbar">
           <div>
             <h4 className="px-3 text-[10px] font-bold text-[#5a5f6b] uppercase tracking-widest mb-2">{t.sidebar.collections}</h4>
             <div className="space-y-1">
@@ -186,10 +171,26 @@ const Library: React.FC<Props> = ({
           </div>
 
           <div>
-            <h4 className="px-3 text-[10px] font-bold text-[#5a5f6b] uppercase tracking-widest mb-2">{t.sidebar.albums}</h4>
+            <div className="flex items-center justify-between px-3 mb-2">
+              <h4 className="text-[10px] font-bold text-[#5a5f6b] uppercase tracking-widest">{t.sidebar.albums}</h4>
+              <button 
+                onClick={handleCreateAlbum} 
+                className="p-1 hover:bg-[#3a3f4b] rounded text-[#00bcd4] transition-all hover:scale-110 active:scale-95"
+                title={t.sidebar.newAlbum}
+              >
+                <FolderPlus className="w-4 h-4" />
+              </button>
+            </div>
             <div className="space-y-1">
               {albums.map(album => (
-                <NavItem key={album.id} icon={<Folder className="w-4 h-4" />} label={album.name} active={activeCollection === album.id} onClick={() => setActiveCollection(album.id)} count={assets.filter(a => a.albumId === album.id && !a.inTrash).length} />
+                <NavItem 
+                  key={album.id} 
+                  icon={<Folder className="w-4 h-4" />} 
+                  label={album.name} 
+                  active={activeCollection === album.id} 
+                  onClick={() => setActiveCollection(album.id)} 
+                  count={assets.filter(a => a.albumId === album.id && !a.inTrash).length} 
+                />
               ))}
             </div>
           </div>
@@ -200,11 +201,10 @@ const Library: React.FC<Props> = ({
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 flex flex-col bg-[#0f1115] relative">
         <header className="border-b border-[#2a2f3b] bg-[#0f1115]/80 backdrop-blur-md sticky top-0 z-10">
           <div className="h-16 flex items-center justify-between px-6 gap-4">
-            <div className="flex flex-col">
+            <div className="flex flex-col shrink-0">
               <h2 className="text-sm font-bold text-white tracking-tight">{activeTitle}</h2>
               <p className="text-[10px] text-[#5a5f6b]">{filteredAssets.length} items</p>
             </div>
@@ -214,50 +214,33 @@ const Library: React.FC<Props> = ({
               <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder={t.library.searchPlaceholder} className="bg-transparent border-none outline-none text-sm w-full text-white placeholder-[#5a5f6b]" />
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 shrink-0">
               <div className="flex bg-[#21252b] rounded-lg p-1 border border-[#2a2f3b]">
-                <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded-md ${viewMode === 'grid' ? 'bg-[#3a3f4b] text-[#00bcd4]' : 'text-[#9a9fa8]'}`} title="Grid"><Grid className="w-4 h-4" /></button>
-                <button onClick={() => setViewMode('masonry')} className={`p-1.5 rounded-md ${viewMode === 'masonry' ? 'bg-[#3a3f4b] text-[#00bcd4]' : 'text-[#9a9fa8]'}`} title="Masonry"><Layout className="w-4 h-4" /></button>
-                <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-md ${viewMode === 'list' ? 'bg-[#3a3f4b] text-[#00bcd4]' : 'text-[#9a9fa8]'}`} title="List"><List className="w-4 h-4" /></button>
+                <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded-md ${viewMode === 'grid' ? 'bg-[#3a3f4b] text-[#00bcd4]' : 'text-[#9a9fa8]'}`}><Grid className="w-4 h-4" /></button>
+                <button onClick={() => setViewMode('masonry')} className={`p-1.5 rounded-md ${viewMode === 'masonry' ? 'bg-[#3a3f4b] text-[#00bcd4]' : 'text-[#9a9fa8]'}`}><Layout className="w-4 h-4" /></button>
+                <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-md ${viewMode === 'list' ? 'bg-[#3a3f4b] text-[#00bcd4]' : 'text-[#9a9fa8]'}`}><List className="w-4 h-4" /></button>
               </div>
+              <button onClick={() => navigateTo('import')} className="px-4 py-2 bg-[#00bcd4] hover:bg-[#00acc1] text-white rounded-lg text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-[#00bcd4]/20"><Plus className="w-4 h-4" /> {t.library.import}</button>
             </div>
           </div>
 
-          {/* Filter Bar */}
-          <div className="px-6 py-2 border-t border-[#2a2f3b] flex items-center gap-4 overflow-x-auto no-scrollbar">
+          <div className="px-6 py-2 border-t border-[#2a2f3b] flex items-center gap-4 overflow-x-auto no-scrollbar bg-[#0f1115]/40">
             <div className="flex items-center gap-1 bg-[#21252b] rounded-lg p-0.5 border border-[#2a2f3b]">
               <FilterButton active={filterImage} onClick={() => setFilterImage(!filterImage)} icon={<ImageIcon className="w-3.5 h-3.5" />} label="Images" />
               <FilterButton active={filterVideo} onClick={() => setFilterVideo(!filterVideo)} icon={<Video className="w-3.5 h-3.5" />} label="Videos" />
             </div>
-
-            <div className="h-4 w-px bg-[#2a2f3b]" />
-
             <div className="flex items-center gap-1">
               {[1, 2, 3, 4, 5].map(star => (
-                <button 
-                  key={star}
-                  onClick={() => setFilterMinRating(filterMinRating === star ? 0 : star)}
-                  className={`p-1.5 rounded-md transition-all ${filterMinRating >= star ? 'text-yellow-500' : 'text-[#5a5f6b] hover:text-[#9a9fa8]'}`}
-                >
-                  <Star className={`w-4 h-4 ${filterMinRating >= star ? 'fill-current' : ''}`} />
-                </button>
+                <button key={star} onClick={() => setFilterMinRating(filterMinRating === star ? 0 : star)} className={`p-1.5 rounded-md transition-all ${filterMinRating >= star ? 'text-yellow-500' : 'text-[#5a5f6b] hover:text-[#9a9fa8]'}`}><Star className={`w-4 h-4 ${filterMinRating >= star ? 'fill-current' : ''}`} /></button>
               ))}
-              {filterMinRating > 0 && <span className="text-[10px] text-white font-bold ml-1">{filterMinRating}+</span>}
             </div>
-
-            <div className="h-4 w-px bg-[#2a2f3b]" />
-
             <FilterButton active={filterFavorite} onClick={() => setFilterFavorite(!filterFavorite)} icon={<Heart className={`w-3.5 h-3.5 ${filterFavorite ? 'fill-current' : ''}`} />} label="Favorites" />
-
             {(filterImage || filterVideo || filterFavorite || filterMinRating > 0 || searchQuery) && (
-              <button onClick={resetFilters} className="ml-auto text-[10px] font-bold text-red-400 hover:text-red-300 flex items-center gap-1">
-                <FilterX className="w-3 h-3" /> Reset Filters
-              </button>
+              <button onClick={() => { setFilterVideo(false); setFilterImage(false); setFilterFavorite(false); setFilterMinRating(0); setSearchQuery(''); }} className="ml-auto text-[10px] font-bold text-red-400 flex items-center gap-1"><FilterX className="w-3 h-3" /> Reset</button>
             )}
           </div>
         </header>
 
-        {/* Asset Grid / List */}
         <div className="flex-1 overflow-y-auto p-6">
           {viewMode === 'list' ? (
             <div className="bg-[#1a1d23] rounded-xl border border-[#2a2f3b] overflow-hidden">
@@ -275,13 +258,7 @@ const Library: React.FC<Props> = ({
                   </thead>
                   <tbody className="divide-y divide-[#2a2f3b]/50">
                     {filteredAssets.map(asset => (
-                      <ListRow 
-                        key={asset.id} 
-                        asset={asset} 
-                        isSelected={selectedAsset?.id === asset.id} 
-                        onClick={() => setSelectedAsset(asset)}
-                        onDoubleClick={() => onOpenAsset(asset)}
-                      />
+                      <ListRow key={asset.id} asset={asset} isSelected={selectedAsset?.id === asset.id} onClick={() => setSelectedAsset(asset)} onDoubleClick={() => onOpenAsset(asset)} />
                     ))}
                   </tbody>
                </table>
@@ -296,7 +273,6 @@ const Library: React.FC<Props> = ({
         </div>
       </main>
 
-      {/* Inspector Panel */}
       <aside className={`w-80 bg-[#1a1d23] border-l border-[#2a2f3b] flex flex-col shrink-0 transition-all duration-300 ${selectedAsset ? 'translate-x-0' : 'translate-x-full absolute right-0 h-full'}`}>
         {selectedAsset && (
           <>
@@ -327,35 +303,34 @@ const Library: React.FC<Props> = ({
                   <section>
                     <h4 className="text-[10px] font-bold text-[#5a5f6b] uppercase tracking-widest mb-3">Workflow Actions</h4>
                     <div className="space-y-2">
-                      {!selectedAsset.inTrash ? (
-                        <>
-                          <ActionButton icon={<Edit2 className="w-3.5 h-3.5" />} label={language === 'en' ? "Rename File" : "Đổi tên tệp"} onClick={handleRename} />
-                          <ActionButton icon={<ExternalLink className="w-3.5 h-3.5" />} label={language === 'en' ? "Show in Folder" : "Hiển thị trong thư mục"} onClick={handleOpenInFolder} />
-                          <ActionButton icon={<Trash2 className="w-3.5 h-3.5 text-red-400" />} label={language === 'en' ? "Move to Trash" : "Chuyển vào Thùng rác"} onClick={handleMoveToTrash} />
-                        </>
-                      ) : (
-                        <>
-                          <ActionButton icon={<RotateCcw className="w-3.5 h-3.5 text-green-400" />} label={language === 'en' ? "Restore Asset" : "Khôi phục tài sản"} onClick={handleMoveToTrash} />
-                        </>
-                      )}
+                       <ActionButton icon={<Edit2 className="w-3.5 h-3.5" />} label="Rename" onClick={() => { const n = prompt("New name:", selectedAsset.name); if(n) updateAsset(selectedAsset.id, {name: n}); }} />
+                       <ActionButton icon={<Trash2 className="w-3.5 h-3.5 text-red-400" />} label="Trash" onClick={handleMoveToTrash} />
                     </div>
                   </section>
                 </>
               )}
-              {activeTab === 'tags' && (
-                <div className="flex flex-wrap gap-2">
-                  {selectedAsset.tags.map(tag => (
-                    <span key={tag} className="px-2 py-1 bg-[#21252b] border border-[#2a2f3b] rounded text-[10px] text-[#e0e0e0] flex items-center gap-1">
-                      {tag} <LucideX className="w-2.5 h-2.5 text-[#5a5f6b]" />
-                    </span>
-                  ))}
-                </div>
-              )}
               {activeTab === 'organize' && (
                 <div className="space-y-1">
+                  <h4 className="text-[10px] font-bold text-[#5a5f6b] uppercase tracking-widest mb-3 px-1">Move to Album</h4>
                   {albums.map(album => (
-                    <AlbumOption key={album.id} label={album.name} active={selectedAsset.albumId === album.id} onClick={() => updateAsset(selectedAsset.id, { albumId: album.id })} />
+                    <AlbumOption 
+                      key={album.id} 
+                      label={album.name} 
+                      active={selectedAsset.albumId === album.id} 
+                      onClick={() => {
+                        updateAsset(selectedAsset.id, { albumId: album.id });
+                        showToast(`Moved to ${album.name}`);
+                      }} 
+                    />
                   ))}
+                  <AlbumOption 
+                    label="Unsorted" 
+                    active={!selectedAsset.albumId} 
+                    onClick={() => {
+                      updateAsset(selectedAsset.id, { albumId: undefined });
+                      showToast(`Moved to Unsorted`);
+                    }} 
+                  />
                 </div>
               )}
             </div>
@@ -373,20 +348,47 @@ const Library: React.FC<Props> = ({
           </>
         )}
       </aside>
+
+      {/* Album Creation Modal */}
+      {showAlbumModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-[#1a1d23] border border-[#2a2f3b] rounded-2xl shadow-2xl p-8 w-96 space-y-6 animate-in fade-in zoom-in-95">
+            <div>
+              <h3 className="text-xl font-bold text-white mb-1">Create New Album</h3>
+              <p className="text-xs text-[#5a5f6b]">Enter a name for your new album</p>
+            </div>
+            <input
+              type="text"
+              value={newAlbumName}
+              onChange={(e) => setNewAlbumName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleConfirmCreateAlbum()}
+              placeholder="Album name..."
+              autoFocus
+              className="w-full px-4 py-2 bg-[#21252b] border border-[#2a2f3b] rounded-lg text-white placeholder-[#5a5f6b] focus:border-[#00bcd4] outline-none transition-all"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowAlbumModal(false)}
+                className="flex-1 px-4 py-2 bg-[#21252b] border border-[#2a2f3b] rounded-lg text-white text-sm font-bold hover:bg-[#2a2f3b] transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmCreateAlbum}
+                disabled={!newAlbumName.trim()}
+                className="flex-1 px-4 py-2 bg-[#00bcd4] text-white text-sm font-bold rounded-lg hover:bg-[#00acc1] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-// Sub-components
-const FilterButton: React.FC<{ active: boolean, onClick: () => void, icon: React.ReactNode, label: string }> = ({ active, onClick, icon, label }) => (
-  <button 
-    onClick={onClick}
-    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${active ? 'bg-[#3a3f4b] text-[#00bcd4]' : 'text-[#5a5f6b] hover:text-[#9a9fa8]'}`}
-  >
-    {icon} {label}
-  </button>
-);
-
+// Internal Components
 const NavItem: React.FC<{ icon: React.ReactNode, label: string, active?: boolean, onClick?: () => void, count?: number }> = ({ icon, label, active, onClick, count }) => (
   <button onClick={onClick} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all group ${active ? 'bg-[#00bcd4]/10 text-[#00bcd4]' : 'text-[#9a9fa8] hover:bg-[#21252b] hover:text-[#e0e0e0]'}`}>
     <span className={`${active ? 'text-[#00bcd4]' : 'text-[#5a5f6b] group-hover:text-[#00bcd4]'} transition-colors`}>{icon}</span>
@@ -395,32 +397,19 @@ const NavItem: React.FC<{ icon: React.ReactNode, label: string, active?: boolean
   </button>
 );
 
+const FilterButton: React.FC<{ active: boolean, onClick: () => void, icon: React.ReactNode, label: string }> = ({ active, onClick, icon, label }) => (
+  <button onClick={onClick} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${active ? 'bg-[#3a3f4b] text-[#00bcd4]' : 'text-[#5a5f6b] hover:text-[#9a9fa8]'}`}>{icon} {label}</button>
+);
+
 const ListRow: React.FC<{ asset: Asset, isSelected: boolean, onClick: () => void, onDoubleClick: () => void }> = ({ asset, isSelected, onClick, onDoubleClick }) => (
-  <tr 
-    onClick={onClick}
-    onDoubleClick={onDoubleClick}
-    className={`hover:bg-[#21252b] transition-colors cursor-pointer group ${isSelected ? 'bg-[#00bcd4]/10' : ''}`}
-  >
-    <td className="px-4 py-2 flex justify-center">
-      <div className="w-10 h-10 rounded overflow-hidden border border-white/5 relative">
-        <img src={asset.thumbnail} className="w-full h-full object-cover" />
-        {asset.type === 'video' && <Film className="absolute bottom-1 right-1 w-2.5 h-2.5 text-white" />}
-      </div>
-    </td>
-    <td className="px-4 py-2">
-      <p className="text-xs font-bold text-white group-hover:text-[#00bcd4] transition-colors truncate max-w-[200px]">{asset.name}</p>
-    </td>
+  <tr onClick={onClick} onDoubleClick={onDoubleClick} className={`hover:bg-[#21252b] transition-colors cursor-pointer group ${isSelected ? 'bg-[#00bcd4]/10' : ''}`}>
+    <td className="px-4 py-2 flex justify-center"><div className="w-10 h-10 rounded overflow-hidden border border-white/5 relative"><img src={asset.thumbnail} className="w-full h-full object-cover" />{asset.type === 'video' && <Film className="absolute bottom-1 right-1 w-2.5 h-2.5 text-white" />}</div></td>
+    <td className="px-4 py-2"><p className="text-xs font-bold text-white group-hover:text-[#00bcd4] truncate max-w-[200px]">{asset.name}</p></td>
     <td className="px-4 py-2 text-[10px] text-[#5a5f6b] uppercase font-mono">{asset.name.split('.').pop()}</td>
     <td className="px-4 py-2 text-[10px] text-[#5a5f6b]">{asset.resolution}</td>
     <td className="px-4 py-2 text-[10px] text-[#5a5f6b]">{asset.size}</td>
     <td className="px-4 py-2 text-[10px] text-[#5a5f6b]">{asset.date}</td>
-    <td className="px-4 py-2 text-right">
-      <div className="flex items-center justify-end gap-0.5">
-        {[1, 2, 3, 4, 5].map(s => (
-          <Star key={s} className={`w-2.5 h-2.5 ${asset.rating >= s ? 'text-yellow-500 fill-current' : 'text-[#2a2f3b]'}`} />
-        ))}
-      </div>
-    </td>
+    <td className="px-4 py-2 text-right"><div className="flex items-center justify-end gap-0.5">{[1, 2, 3, 4, 5].map(s => (<Star key={s} className={`w-2.5 h-2.5 ${asset.rating >= s ? 'text-yellow-500 fill-current' : 'text-[#2a2f3b]'}`} />))}</div></td>
   </tr>
 );
 
@@ -429,12 +418,6 @@ const AssetCard: React.FC<{ asset: Asset, isSelected: boolean, onClick: () => vo
     <img src={asset.thumbnail} alt={asset.name} className={`w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-105 ${viewMode === 'masonry' ? 'h-auto' : ''}`} loading="lazy" />
     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-end">
        <p className="text-[10px] font-bold text-white truncate">{asset.name}</p>
-       <div className="flex items-center justify-between mt-1">
-          <div className="flex gap-0.5">
-             {asset.rating > 0 && <span className="text-yellow-500 flex items-center gap-0.5 text-[9px]"><Star className="w-2 h-2 fill-current" /> {asset.rating}</span>}
-          </div>
-          {asset.favorite && <Heart className="w-3 h-3 text-red-500 fill-current" />}
-       </div>
     </div>
     {asset.type === 'video' && <div className="absolute top-2 right-2 p-1.5 bg-black/50 backdrop-blur-md rounded-lg"><Film className="w-3 h-3 text-white" /></div>}
   </div>
@@ -445,24 +428,16 @@ const InspectorTab: React.FC<{ label: string, active: boolean, onClick: () => vo
 );
 
 const MetaItem: React.FC<{ label: string, value: string | number | undefined }> = ({ label, value }) => (
-  <div>
-    <p className="text-[10px] text-[#5a5f6b] mb-0.5">{label}</p>
-    <p className="text-white font-medium truncate pr-2">{value || '--'}</p>
-  </div>
+  <div><p className="text-[10px] text-[#5a5f6b] mb-0.5">{label}</p><p className="text-white font-medium truncate pr-2">{value || '--'}</p></div>
 );
 
 const ActionButton: React.FC<{ icon: React.ReactNode, label: string, onClick?: () => void }> = ({ icon, label, onClick }) => (
-  <button onClick={onClick} className="w-full flex items-center gap-3 px-3 py-2 bg-[#21252b] border border-[#2a2f3b] hover:border-[#3a3f4b] rounded-lg text-xs text-[#9a9fa8] hover:text-white transition-all text-left">
-    {icon} {label}
-  </button>
+  <button onClick={onClick} className="w-full flex items-center gap-3 px-3 py-2 bg-[#21252b] border border-[#2a2f3b] hover:border-[#3a3f4b] rounded-lg text-xs text-[#9a9fa8] hover:text-white transition-all text-left">{icon} {label}</button>
 );
 
 const AlbumOption: React.FC<{ label: string, active: boolean, onClick: () => void }> = ({ label, active, onClick }) => (
   <button onClick={onClick} className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all ${active ? 'bg-[#00bcd4]/10 text-[#00bcd4] font-bold' : 'text-[#9a9fa8] hover:bg-[#21252b]'}`}>
-    <div className="flex items-center gap-2">
-      <Folder className={`w-3.5 h-3.5 ${active ? 'text-[#00bcd4]' : 'text-[#5a5f6b]'}`} />
-      {label}
-    </div>
+    <div className="flex items-center gap-2"><Folder className={`w-3.5 h-3.5 ${active ? 'text-[#00bcd4]' : 'text-[#5a5f6b]'}`} /> {label}</div>
     {active && <Check className="w-3.5 h-3.5" />}
   </button>
 );

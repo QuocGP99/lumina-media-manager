@@ -75,7 +75,7 @@ const ExportWizard: React.FC<Props> = ({ onBack, selectedCount }) => {
                   </div>
                   <div className="flex items-center gap-2 text-[10px] text-[#5a5f6b]">
                     <Settings className="w-3 h-3" />
-                    <span>Using Global Naming Template. Edit in Settings > Export.</span>
+                    <span>Using Global Naming Template. Edit in Settings {'>'} Export.</span>
                   </div>
                </div>
             </div>

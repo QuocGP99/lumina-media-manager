@@ -31,16 +31,13 @@ const App: React.FC = () => {
   // Keyboard Navigation / Global Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Numbers 1-5 for rating
       if (selectedAsset && e.key >= '1' && e.key <= '5') {
         const rating = parseInt(e.key);
         updateAsset(selectedAsset.id, { rating });
       }
-      // 'f' for favorite
       if (selectedAsset && e.key.toLowerCase() === 'f') {
         updateAsset(selectedAsset.id, { favorite: !selectedAsset.favorite });
       }
-      // 'Escape' to close viewer or reset selection
       if (e.key === 'Escape') {
         if (currentScreen === 'viewer' || currentScreen === 'export' || currentScreen === 'import') {
           setCurrentScreen('library');
@@ -71,9 +68,10 @@ const App: React.FC = () => {
   };
 
   const handleAddAlbum = (name: string) => {
-    const newAlbum = { id: name.toLowerCase().replace(/\s+/g, '-'), name };
+    const newId = `album-${Date.now()}`;
+    const newAlbum = { id: newId, name };
     setAlbums(prev => [...prev, newAlbum]);
-    return newAlbum.id;
+    return newId;
   };
 
   const renderScreen = () => {
@@ -102,36 +100,17 @@ const App: React.FC = () => {
           />
         ) : null;
       case 'dedup':
-        return (
-          <Deduplication 
-            onBack={() => setCurrentScreen('library')} 
-          />
-        );
+        return <Deduplication onBack={() => setCurrentScreen('library')} />;
       case 'projects':
-        return (
-          <Projects 
-            projects={projects}
-            onBack={() => setCurrentScreen('library')}
-          />
-        );
+        return <Projects projects={projects} onBack={() => setCurrentScreen('library')} />;
       case 'settings':
-        return (
-          <Settings 
-            language={language}
-            setLanguage={setLanguage}
-            onBack={() => setCurrentScreen('library')}
-          />
-        );
+        return <Settings language={language} setLanguage={setLanguage} onBack={() => setCurrentScreen('library')} />;
       case 'export':
-        return (
-          <ExportWizard 
-            onBack={() => setCurrentScreen('library')}
-            selectedCount={12} // Mock selection count
-          />
-        );
+        return <ExportWizard onBack={() => setCurrentScreen('library')} selectedCount={12} />;
       case 'import':
         return (
           <ImportWizard 
+            albums={albums}
             onBack={() => setCurrentScreen('library')}
             onImportComplete={(newAssets) => {
               setAssets(prev => [...newAssets, ...prev]);
